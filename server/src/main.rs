@@ -4,7 +4,7 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
 // use std::net::SocketAddr;
 
-use db::app_configure::AppConfigure;
+use db::app_configure::{AppConfigure, DataType};
 // static POOL: OnceCell<Pool<Postgres>> = OnceCell::new();
 
 #[tokio::main]
@@ -20,6 +20,18 @@ async fn main() {
     // let _ = POOL.set(pool);
     // let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     // println!("Server listening on {}...", addr);
+    let _ = AppConfigure::insert(
+        &pool,
+        AppConfigure {
+            id: None,
+            name: "test1".to_string(),
+            data_type: DataType::INT,
+            data: "120".to_string(),
+            description: None,
+            effective: None,
+        },
+    )
+    .await;
     let rows = AppConfigure::query_effective(&pool).await;
     println!("{:#?}", rows);
 }

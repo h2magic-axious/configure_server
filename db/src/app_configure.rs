@@ -59,23 +59,31 @@ impl AppConfigure {
             .collect()
     }
 
-    // pub fn insert(pool: &PgPool, app_configure: Self) -> Self {
-    //     let data_type: &str = app_configure.data_type.to_string();
+    pub async fn insert(pool: &PgPool, app_configure: Self) -> Self {
+        let data_type: &str = app_configure.data_type.to_string();
 
-    //     let row = sqlx::query!(
-    //         r#"
-            
-    //         "#,
-            
-    //     )
+        let r = sqlx::query!(
+            r#"
+            INSERT INTO app_configure(name, data_type, data, description)
+            VALUES($1, $2, $3, $4)
+            RETURNING *
+            "#,
+            app_configure.name,
+            data_type,
+            app_configure.data,
+            app_configure.description
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
 
-    //     AppConfigure {
-    //         id: (),
-    //         name: (),
-    //         data_type: (),
-    //         data: (),
-    //         description: (),
-    //         effective: (),
-    //     }
-    // }
+        AppConfigure {
+            id: Some(r.id as u32),
+            name: r.name.clone(),
+            data: r.data.clone().unwrap(),
+            data_type: DataType::from_string(r.data_type.as_str()),
+            description: r.description.clone(),
+            effective: r.effective,
+        }
+    }
 }
