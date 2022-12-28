@@ -20,12 +20,7 @@ async fn main() {
     // let _ = POOL.set(pool);
     // let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     // println!("Server listening on {}...", addr);
+    let _ = AppConfigure::delete(&pool, 4).await;
     let rows = AppConfigure::all(&pool).await;
     println!("{:#?}", rows);
-    let mut row = rows[3].clone();
-    println!("{:#?}", row);
-    row.name = "hello".to_string();
-    row.effective = Some(false);
-    let mut_data = AppConfigure::update(&pool, row).await;
-    println!("{:#?}", mut_data);
 }

@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPool;
-use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum DataType {
@@ -120,5 +119,32 @@ impl AppConfigure {
             }
             None => Self::insert(pool, app_configure).await,
         }
+    }
+
+    pub async fn delete(pool: &PgPool, id: i32) {
+        let _ = sqlx::query!("DELETE FROM app_configure WHERE id=$1", id)
+            .fetch_one(pool)
+            .await;
+    }
+
+    pub async fn query_with_name(pool: &PgPool, name: String) -> Self {
+        let rows = sqlx::query!("SELECT * FROM app_configure WHERE name=$1", name)
+            .fetch_all(pool)
+            .await
+            .unwrap();
+
+        let self_list: Vec<Self> = rows
+            .iter()
+            .map(|r| AppConfigure {
+                id: Some(r.id as u32),
+                name: r.name.clone(),
+                data: r.data.clone().unwrap(),
+                data_type: DataType::from_string(r.data_type.as_str()),
+                description: r.description.clone(),
+                effective: r.effective,
+            })
+            .collect();
+
+        self_list[0].clone()
     }
 }
