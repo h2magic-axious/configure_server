@@ -1,7 +1,7 @@
+use std::collections::HashMap;
 use dotenv::dotenv;
 use once_cell::sync::OnceCell;
 use sqlx::postgres::PgPoolOptions;
-use sqlx::{Pool, Postgres};
 // use std::net::SocketAddr;
 
 use db::app_configure::{AppConfigure, DataType};
@@ -20,18 +20,12 @@ async fn main() {
     // let _ = POOL.set(pool);
     // let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     // println!("Server listening on {}...", addr);
-    let _ = AppConfigure::insert(
-        &pool,
-        AppConfigure {
-            id: None,
-            name: "test1".to_string(),
-            data_type: DataType::INT,
-            data: "120".to_string(),
-            description: None,
-            effective: None,
-        },
-    )
-    .await;
-    let rows = AppConfigure::query_effective(&pool).await;
+    let rows = AppConfigure::all(&pool).await;
     println!("{:#?}", rows);
+    let mut row = rows[3].clone();
+    println!("{:#?}", row);
+    row.name = "hello".to_string();
+    row.effective = Some(false);
+    let mut_data = AppConfigure::update(&pool, row).await;
+    println!("{:#?}", mut_data);
 }

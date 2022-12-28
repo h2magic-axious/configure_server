@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPool;
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum DataType {
@@ -41,8 +42,8 @@ pub struct AppConfigure {
 }
 
 impl AppConfigure {
-    pub async fn query_effective(pool: &PgPool) -> Vec<AppConfigure> {
-        let rows = sqlx::query!("SELECT * FROM app_configure WHERE effective = TRUE")
+    pub async fn all(pool: &PgPool) -> Vec<AppConfigure> {
+        let rows = sqlx::query!("SELECT * FROM app_configure")
             .fetch_all(pool)
             .await
             .unwrap();
@@ -84,6 +85,40 @@ impl AppConfigure {
             data_type: DataType::from_string(r.data_type.as_str()),
             description: r.description.clone(),
             effective: r.effective,
+        }
+    }
+
+    pub async fn update(pool: &PgPool, app_configure: Self) -> Self {
+        match app_configure.id {
+            Some(id) => {
+                let data_type: &str = app_configure.data_type.to_string();
+                let r = sqlx::query!(
+                    r#"
+                    UPDATE app_configure SET
+                    name=$1, data=$2, data_type=$3, description=$4, effective=$5
+                    WHERE id=$6
+                    RETURNING *
+                    "#,
+                    app_configure.name,
+                    app_configure.data,
+                    data_type,
+                    app_configure.description,
+                    app_configure.effective,
+                    id as i32
+                )
+                .fetch_one(pool)
+                .await
+                .unwrap();
+                AppConfigure {
+                    id: Some(r.id as u32),
+                    name: r.name.clone(),
+                    data: r.data.clone().unwrap(),
+                    data_type: DataType::from_string(r.data_type.as_str()),
+                    description: r.description.clone(),
+                    effective: r.effective,
+                }
+            }
+            None => Self::insert(pool, app_configure).await,
         }
     }
 }
