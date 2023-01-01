@@ -1,14 +1,17 @@
 use axum::{
     body::{Body, Bytes},
+    extract::Path,
     http::{self, HeaderValue, Method, Request, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use chrono::Local;
+use db::app_configure::AppConfigure;
 use dotenv::dotenv;
 use once_cell::sync::OnceCell;
+use serde_json::json;
 use sqlx::postgres::{PgPoolOptions, Postgres};
 use sqlx::Pool;
 use std::net::SocketAddr;
@@ -39,6 +42,9 @@ async fn main() {
     let app = Router::new()
         .layer(cors_layer)
         .route("/", get(hello_world))
+        .route("/all-app-configure", get(all_app_configure))
+        .route("/query-one/:name", get(query_one))
+        .route("/update-one", post(update_one))
         .layer(middleware::from_fn(custom_middleware));
 
     axum::Server::bind(&addr)
@@ -94,4 +100,55 @@ where
 
 async fn hello_world() -> impl IntoResponse {
     Json("Hello World!")
+}
+
+async fn all_app_configure() -> impl IntoResponse {
+    let rows = AppConfigure::all(&POOL.get().unwrap()).await;
+    Json(json!({
+        "code": 1,
+        "result": rows.iter().map(|r| r.to_json()).collect::<serde_json::Value>()
+    }))
+}
+
+async fn query_one(Path(name): Path<String>) -> impl IntoResponse {
+    let row = AppConfigure::query_by_name(&POOL.get().unwrap(), name).await;
+    Json(json!({
+        "code": 1,
+        "result": row
+    }))
+}
+
+async fn update_one(Json(body): Json<serde_json::Value>) -> impl IntoResponse {
+    println!("{:?}", body);
+
+    let name = body.get("name");
+    let field = body.get("field");
+    let value = body.get("value");
+
+    if name.is_none() {
+        return Json(json!({"code": 0, "result": "未找到配置名"}));
+    }
+
+    if field.is_none() {
+        return Json(json!({"code": 0, "result": "未设置要修改的字段名"}));
+    }
+
+    if value.is_none() {
+        return Json(json!({"code": 0, "result": "未设置要修改的字段值"}));
+    }
+
+    let update_status = AppConfigure::update_field_value_with_name(
+        &POOL.get().unwrap(),
+        name.unwrap().as_str().unwrap(),
+        field.unwrap().as_str().unwrap(),
+        value.unwrap().as_str().unwrap(),
+    )
+    .await;
+
+    match update_status {
+        true => Json(json!({"code": 1, "result": "success"})),
+        false => Json(json!({"code": 0, "result": "fail"})),
+    }
+
+    
 }

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sqlx::postgres::PgPool;
+use sqlx::postgres::{PgPool, Postgres};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum DataType {
@@ -40,7 +40,38 @@ pub struct AppConfigure {
     pub effective: Option<bool>,
 }
 
+// macro_rules! build_app_configure {
+//     ($r:expr) => {
+//         AppConfigure {
+//             id: Some(r.id as u32),
+//             name: r.name.clone(),
+//             data: r.data.clone().unwrap(),
+//             data_type: DataType::from_string(r.data_type.as_str()),
+//             description: r.description.clone(),
+//             effective: r.effective,
+//         }
+//     };
+// }
+
 impl AppConfigure {
+    pub fn to_json(&self) -> serde_json::Value {
+        let value = match self.data_type {
+            DataType::INT => serde_json::json!(self.data.parse::<i32>().unwrap()),
+            DataType::FLOAT => serde_json::json!(self.data.parse::<f64>().unwrap()),
+            DataType::BOOL => serde_json::json!(self.data.to_lowercase().as_str() == "true"),
+            DataType::STRING => serde_json::json!(self.data),
+        };
+
+        serde_json::json!({
+            "id": self.id,
+            "name": self.name,
+            "data": value,
+            "data_type": self.data_type.to_string(),
+            "effective": self.effective,
+            "descption": self.description
+        })
+    }
+
     pub async fn all(pool: &PgPool) -> Vec<AppConfigure> {
         let rows = sqlx::query!("SELECT * FROM app_configure")
             .fetch_all(pool)
@@ -127,7 +158,28 @@ impl AppConfigure {
             .await;
     }
 
-    pub async fn query_with_name(pool: &PgPool, name: String) -> Self {
+    pub async fn query_by_id(pool: &PgPool, id: i32) -> Self {
+        let rows = sqlx::query!("SELECT * FROM app_configure WHERE id=$1", id)
+            .fetch_all(pool)
+            .await
+            .unwrap();
+
+        let self_list: Vec<Self> = rows
+            .iter()
+            .map(|r| AppConfigure {
+                id: Some(r.id as u32),
+                name: r.name.clone(),
+                data: r.data.clone().unwrap(),
+                data_type: DataType::from_string(r.data_type.as_str()),
+                description: r.description.clone(),
+                effective: r.effective,
+            })
+            .collect();
+
+        self_list[0].clone()
+    }
+
+    pub async fn query_by_name(pool: &PgPool, name: String) -> Self {
         let rows = sqlx::query!("SELECT * FROM app_configure WHERE name=$1", name)
             .fetch_all(pool)
             .await
@@ -146,5 +198,27 @@ impl AppConfigure {
             .collect();
 
         self_list[0].clone()
+    }
+
+    pub async fn update_field_value_with_name(
+        pool: &PgPool,
+        name: &str,
+        field: &str,
+        value: &str,
+    ) -> bool {
+        let sql = format!(
+            "UPDATE app_configure SET {}='{}' WHERE name='{}'",
+            field, value, name
+        );
+        println!("SQL: {:?}", sql);
+        let r = sqlx::query::<Postgres>(sql.as_str()).execute(pool).await;
+
+        match r {
+            Ok(_) => true,
+            Err(err) => {
+                println!("Error: {:?}", err);
+                false
+            }
+        }
     }
 }
